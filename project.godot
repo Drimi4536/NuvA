@@ -1,0 +1,43 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="Словарь"
+config/description="Личный тренажёр английских слов и фраз"
+config/version="1.0.0"
+run/main_scene="res://scenes/main.tscn"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="EnglishTrainer"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0.984, 0.965, 0.933, 1)
+boot_splash/show_image=false
+config/icon="res://icon.svg"
+
+[autoload]
+
+Store="*res://scripts/core/store.gd"
+AppTheme="*res://scripts/ui/app_theme.gd"
+Speech="*res://scripts/core/speech.gd"
+
+[display]
+
+window/size/viewport_width=1180
+window/size/viewport_height=780
+window/size/resizable=true
+window/stretch/mode="disabled"
+
+[gui]
+
+theme/custom_font="res://assets/fonts/Inter-Regular.otf"
+theme/default_font_antialiasing=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.984, 0.965, 0.933, 1)
+
+[audio]
+
+general/text_to_speech=true
