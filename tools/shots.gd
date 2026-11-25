@@ -4,6 +4,7 @@ extends Node
 
 var main: Node
 var out := "out/shots"
+var apkg_path := ""
 
 
 func _ready() -> void:
@@ -91,6 +92,10 @@ func _ready() -> void:
 			await _snap("anki_type_" + t)
 		main.go("home")
 		await _wait(0.3)
+		main.current.call("_import_anki_ask", apkg_path)
+		await _snap("anki_ask_" + t)
+		main.get("_overlay").get_child(0).call("close", null)
+		await _wait(0.3)
 		main.open_modal(VoiceDialog.new())
 		await _snap("voice_" + t)
 		main.get("_overlay").get_child(0).call("close", null)
@@ -131,7 +136,8 @@ func _seed() -> void:
 	var apkg := OS.get_environment("APKG")
 	if apkg == "":
 		apkg = ProjectSettings.globalize_path("res://tests/fixtures/deck_v1.apkg")
-	AnkiImport.import_into_store(apkg)
+	apkg_path = apkg
+	AnkiImport.import_into_store(apkg, "phrase")
 	var big := Store.category_by_name("Big / Deck")
 	if not big.is_empty():
 		Store.delete_category(str(big["id"]))

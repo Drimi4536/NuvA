@@ -307,7 +307,8 @@ func test_anki() -> void:
 	ok(by["b299"]["en"] == "word 299" and by["b299"]["ru"] == "слово 299", "Basic: лицо и оборот")
 	var bad := AnkiImport.read("res://tests/fixtures/deck_new.apkg")
 	ok(not bool(bad["ok"]) and str(bad["error"]).contains("старых версий"), "новый формат — понятная ошибка")
-	# импорт в словарь: одна запись уже была вручную
+	# импорт в словарь (режим «слово»): одна запись уже была вручную
+	Store.set_setting("anki_mode", "word")
 	var lk := Store.add_category("Lookupper / English")
 	Store.add_entry(str(lk["id"]), "walking", "ходить")
 	var t := ProjectSettings.globalize_path("user://test/v1.apkg")
@@ -332,9 +333,19 @@ func test_anki() -> void:
 	ok(int(walk["level"]) == 1, "прогресс после обновления сохранён")
 	ok(Store.count_entries() == 304, "без повторов: 304 записи")
 	ok(HomeScreen_newest() != "", "новейший .apkg в папке находится")
+	# режим «фраза целиком»: те же записи переписываются фразой, прогресс остаётся
+	var ph := AnkiImport.apply_mode(w, "phrase")
+	ok(ph["en"] == "Someone's walking in the attic." and ph["ru"] == "Кто-то ходит на чердаке.", "фраза целиком: английский и перевод")
+	ok(str(ph["note"]).begins_with("walking — ходить") and ph["audio"] == "", "слово — в заметке, звук слова не к фразе")
+	ok(AnkiImport.apply_mode(by["lk-tea"], "phrase")["en"] == "tea time", "без перевода фразы — остаётся слово")
+	var i3 := AnkiImport.import_into_store(t2, "phrase")
+	ok(int(i3["updated"]) == 1 and int(i3["added"]) == 0, "переключение на фразы: обновлена 1 (%s)" % i3)
+	ok(walk["en"] == "Someone's walking in the attic." and int(walk["level"]) == 1, "запись стала фразой, прогресс тот же")
+	ok(AnkiImport.phrase_example(t2).get("guid") == "lk-walk", "пример фразы для вопроса")
 	# озвучка: звук из Anki
 	ok(Speech.stream_for("walk.mp3") is AudioStreamMP3, "mp3 из Anki загружается")
-	ok(Speech.can_speak(walk) and Speech.speak_entry(walk), "запись со звуком озвучивается")
+	var snd := {"en": "walking", "audio": "walk.mp3"}
+	ok(Speech.can_speak(snd) and Speech.speak_entry(snd), "запись со звуком озвучивается")
 	Speech.stop()
 	ok(Speech.clean("I [b]see[/b] [lb]x]") == "I see [x]", "текст для голоса без разметки")
 	# экспорт для Anki

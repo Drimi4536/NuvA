@@ -450,10 +450,60 @@ func _file(mode: FileDialog.FileMode, fname: String, kind := "json") -> void:
 					+ "(английский — лицо, перевод — оборот).") % UI.n_entries(n), "Понятно"))
 		elif mode == FileDialog.FILE_MODE_SAVE_FILE:
 			main.toast("Словарь сохранён: %s" % p.get_file() if Store.export_to(p) else "Не удалось сохранить файл", 3.5)
+		elif p.get_extension().to_lower() in ["apkg", "colpkg"]:
+			_import_anki_ask(p)
 		else:
 			_import(p))
 	add_child(_file_dialog)
 	_file_dialog.popup_centered(Vector2i(820, 560))
+
+
+## Колода с фразами (Lookupper): спросить, что записывать — фразу целиком или слово. Выбор запоминается.
+func _import_anki_ask(p: String) -> void:
+	var ex := AnkiImport.phrase_example(p)
+	if ex.is_empty():
+		_import(p)
+		return
+	var m := Modal.new()
+	m.title_text = "Что записывать в словарь?"
+	m.width = 640.0
+	m.body.add_child(UI.label("В колоде у слов есть фразы, где они встретились. Например:", "Muted", true))
+	var cur := str(Store.setting("anki_mode", "phrase"))
+	var phrase := AnkiImport.apply_mode(ex, "phrase")
+	for opt in [["phrase", "Фразу целиком", "%s\n%s" % [phrase["en"], phrase["ru"]]],
+			["word", "Только слово", "%s — %s\n(фраза — подсказкой под ответом)" % [ex["en"], ex["ru"]]]]:
+		var b := Button.new()
+		b.theme_type_variation = "Tile"
+		b.toggle_mode = true
+		b.button_pressed = opt[0] == cur
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.custom_minimum_size = Vector2(0, 92)
+		var mc := MarginContainer.new()
+		mc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for side in ["left", "right", "top", "bottom"]:
+			mc.add_theme_constant_override("margin_" + side, 16 if side in ["left", "right"] else 12)
+		b.add_child(mc)
+		var v := UI.vbox(4)
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mc.add_child(v)
+		var t := UI.label(str(opt[1]), "Entry")
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(t)
+		var d := UI.label(str(opt[2]), "Small", true)
+		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(d)
+		var mode: String = opt[0]
+		b.pressed.connect(func() -> void: m.close(mode))
+		m.body.add_child(b)
+	m.body.add_child(UI.label("Уже добавленные из этой колоды записи перепишутся по выбору, прогресс останется.", "Small", true))
+	m.add_button("Отмена", "Ghost", func() -> void: m.close(null))
+	main.open_modal(m)
+	var r: Variant = await m.done
+	if r == null:
+		return
+	Store.set_setting("anki_mode", str(r))
+	_import(p)
 
 
 func _import(p: String) -> void:

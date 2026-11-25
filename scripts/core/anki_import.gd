@@ -179,7 +179,44 @@ static func _entities(t: String) -> String:
 
 
 ## Импорт в словарь. Возвращает {ok, error, added, updated, skipped, new_categories, media, backup}.
-static func import_into_store(path: String) -> Dictionary:
+## Что записывать из заметки с фразой-контекстом (Lookupper):
+##   "phrase" — фразу целиком: английский — вся фраза, перевод — её перевод, слово с переводом — в заметке;
+##   "word" — только слово, фраза показывается под ответом.
+## Заметки без фразы или без её перевода всегда идут словом. Смена режима при «Обновить из Anki» переписывает записи, прогресс остаётся.
+static func apply_mode(row: Dictionary, mode: String) -> Dictionary:
+	if mode != "phrase" or str(row.get("ctx", "")) == "" or str(row.get("ctx_ru", "")) == "":
+		return row   # нет фразы или её перевода — остаётся слово
+	var out := row.duplicate()
+	out["en"] = unmark(str(row["ctx"]))
+	out["ru"] = unmark(str(row.get("ctx_ru", "")))
+	var word := "%s — %s" % [row["en"], row["ru"]] if str(row["ru"]) != "" else str(row["en"])
+	out["note"] = word + ("  ·  " + str(row["note"]) if str(row["note"]) != "" else "")
+	out["ctx"] = ""
+	out["ctx_ru"] = ""
+	out["ipa"] = ""
+	out["audio"] = ""   # звук в Lookupper — только у слова; фразу прочитает голос системы
+	return out
+
+
+## [b]…[/b] и [lb] → обычный текст.
+static func unmark(bb: String) -> String:
+	return bb.replace("[b]", "").replace("[/b]", "").replace("[lb]", "[").strip_edges()
+
+
+## Есть ли в колоде фразы-контексты (тогда стоит спросить, что записывать) и пример для вопроса.
+static func phrase_example(path: String) -> Dictionary:
+	var r := read(path)
+	if not bool(r["ok"]):
+		return {}
+	for n in r["notes"]:
+		if str(n["ctx"]) != "":
+			return n
+	return {}
+
+
+static func import_into_store(path: String, mode := "") -> Dictionary:
+	if mode == "":
+		mode = str(Store.setting("anki_mode", "phrase"))
 	var out := {"ok": false, "error": "", "added": 0, "updated": 0, "skipped": 0, "new_categories": 0, "media": 0, "backup": ""}
 	var r := read(path)
 	if not bool(r["ok"]):
@@ -194,7 +231,9 @@ static func import_into_store(path: String) -> Dictionary:
 				by_guid[str(e["anki"])] = e
 	var need_media := {}
 	for n in r["notes"]:
-		var row: Dictionary = n
+		var row: Dictionary = apply_mode(n, mode)
+		if str(row["en"]) == "":
+			continue
 		var e: Dictionary = by_guid.get(str(row["guid"]), {})
 		var h := row_hash(row)
 		if not e.is_empty():
