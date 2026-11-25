@@ -177,7 +177,11 @@ func has_modal() -> bool:
 
 ## Короткое сообщение внизу, само исчезает. С действием — кнопка справа («Вернуть»).
 func toast(text: String, sec := 2.6, action_text := "", action := Callable()) -> void:
+	for t in _toasts.get_children():   # то же сообщение уже висит — второе не добавляем
+		if t.has_meta("text") and str(t.get_meta("text")) == text and not t.is_queued_for_deletion():
+			return
 	var p := UI.card("Toast")
+	p.set_meta("text", text)
 	var h := UI.hbox(14)
 	p.add_child(h)
 	var l := UI.label(text, "ToastLabel")

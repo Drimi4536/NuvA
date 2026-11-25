@@ -15,6 +15,12 @@ func _init() -> void:
 			+ "Голос можно добавить: Windows → Параметры → Время и язык → Речь → «Добавить голоса» → English (United States).",
 			"", true))
 		body.add_child(warn)
+		var all: Array = []
+		if DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
+			for v in DisplayServer.tts_get_voices():
+				all.append("%s (%s)" % [v.get("name", "?"), v.get("language", "?")])
+		body.add_child(UI.label("Голоса, которые видит приложение: " + (", ".join(all) if not all.is_empty() else "ни одного"),
+			"Small", true))
 	else:
 		body.add_child(_row("Английский голос", _voices(en, "voice_en")))
 	if not ru.is_empty():
