@@ -3,6 +3,7 @@
 set -e
 cd "$(dirname "$0")/.."
 godot --headless --path . --import >/dev/null 2>&1 || true
+[ "$(uname)" = "Linux" ] && bash tools/get_piper_linux.sh >/dev/null 2>&1 || true
 godot --headless --path . res://tools/parse_all.tscn 2>&1 | grep -E "PARSE|SCRIPT ERROR|не собирается"
 if command -v xvfb-run >/dev/null; then
   xvfb-run -a godot --path . --resolution 1180x780 res://tests/test_all.tscn 2>&1 | grep -E "FAIL|TEST|SCRIPT ERROR"

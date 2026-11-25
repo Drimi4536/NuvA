@@ -1,3 +1,5 @@
 .godot/
 out/
 *.tmp
+voice/piper-linux/
+voice/cache/

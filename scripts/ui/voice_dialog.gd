@@ -9,7 +9,14 @@ func _init() -> void:
 	body.add_theme_constant_override("separation", 14)
 	var en := Speech.voices("en")
 	var ru := Speech.voices("ru")
-	if en.is_empty():
+	if Speech.piper_found():
+		var pc := _check("Встроенный английский голос (Piper, без интернета)", "use_piper", true)
+		pc.tooltip_text = "Читает любые фразы. Выключите — будет голос Windows"
+		pc.toggled.connect(func(_on: bool) -> void: Speech.stop())
+		body.add_child(pc)
+	if Speech.piper_ok():
+		pass
+	elif en.is_empty():
 		var warn := UI.card("AccentBox")
 		warn.add_child(UI.label("Английский голос системы не найден. Слова со звуком из Anki всё равно озвучиваются.\n"
 			+ "Голос можно добавить: Windows → Параметры → Время и язык → Речь → «Добавить голоса» → English (United States).",
@@ -47,7 +54,7 @@ func _init() -> void:
 	if not ru.is_empty():
 		body.add_child(_check("При «Прослушать» читать и перевод", "listen_ru", true))
 	add_button("Проверить", "", func() -> void:
-		if not Speech.say("Hello! This is how I sound.", "en"):
+		if not Speech.say("Someone's walking in the attic. Hello! This is how I sound.", "en"):
 			Speech.say("Привет! Вот так я звучу.", "ru"))
 	add_button("Готово", "Primary", func() -> void: close(true))
 

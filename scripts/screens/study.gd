@@ -221,6 +221,7 @@ func _show_card() -> void:
 			if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 				_flip())
 	_card_in()
+	_prefetch_next()
 	if _en_first():
 		_auto_speak(e)
 	if _input:
@@ -378,6 +379,16 @@ func _add_note(e: Dictionary) -> void:
 		var pic := UI.picture(str(e["image"]), 150.0, minf(640.0, size.x - 140.0))
 		if pic:
 			_answer_box.add_child(pic)
+
+
+## Заранее приготовить озвучку следующих карточек (встроенный голос — без задержки).
+func _prefetch_next() -> void:
+	var texts: Array = []
+	for j in range(_i, mini(_i + 4, _queue.size())):
+		var x := Store.entry(str(_queue[j]["cid"]), str(_queue[j]["eid"]))
+		if not x.is_empty() and Store.media_path(str(x.get("audio", ""))) == "":
+			texts.append(str(x["en"]))
+	Speech.prefetch(texts)
 
 
 ## Озвучить английский сам (настройка «Озвучивать английский»).

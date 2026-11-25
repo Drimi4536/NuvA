@@ -29,6 +29,7 @@ func _ready() -> void:
 	test_broken_file()
 	test_session()
 	test_anki()
+	await test_piper()
 	await test_ui()
 	ok(_ui_done, "проход по экранам дошёл до конца")
 	print("%s: %d проверок, ошибок %d" % ["TEST OK" if fails == 0 else "TEST FAIL", checks, fails])
@@ -357,6 +358,33 @@ func test_anki() -> void:
 func HomeScreen_newest() -> String:
 	var home: GDScript = load("res://scripts/screens/home.gd")
 	return str(home.call("newest_apkg", ProjectSettings.globalize_path("user://test")))
+
+
+func test_piper() -> void:
+	if not Speech.piper_found():
+		print("  (Piper не найден — проверка встроенного голоса пропущена; tools/get_piper_linux.sh)")
+		return
+	Store.set_setting("use_piper", true)
+	ok(Speech.has_voice("en"), "встроенный голос есть")
+	var phrase := "Someone's walking in the attic, test %d." % randi()
+	ok(Speech.say(phrase, "en"), "фраза отправлена встроенному голосу")
+	ok(Speech.is_speaking(), "пока синтез — «говорит» (для прослушивания по очереди)")
+	var t0 := Time.get_ticks_msec()
+	while Speech.get("_want") != "" and Time.get_ticks_msec() - t0 < 15000:
+		await frames(2)
+	var wav := ProjectSettings.globalize_path(Speech.call("_wav_path", phrase))
+	ok(FileAccess.file_exists(wav) and FileAccess.get_file_as_bytes(wav).size() > 10000, "Piper сделал звук фразы")
+	ok((Speech.get("_player") as AudioStreamPlayer).playing, "звук играет")
+	Speech.stop()
+	var t1 := Time.get_ticks_msec()
+	ok(Speech.say(phrase, "en") and Speech.get("_want") == "" and Time.get_ticks_msec() - t1 < 200, "второй раз — сразу из кэша")
+	Speech.stop()
+	Speech.prefetch(["Prefetch one.", "Prefetch two."])
+	t0 = Time.get_ticks_msec()
+	while not FileAccess.file_exists(ProjectSettings.globalize_path(Speech.call("_wav_path", "Prefetch two."))) \
+			and Time.get_ticks_msec() - t0 < 15000:
+		await frames(2)
+	ok(FileAccess.file_exists(ProjectSettings.globalize_path(Speech.call("_wav_path", "Prefetch two."))), "заранее приготовленные фразы")
 
 
 # ───────────────────────────── экраны
