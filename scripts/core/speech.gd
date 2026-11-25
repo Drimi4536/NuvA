@@ -161,6 +161,8 @@ func _worker() -> void:
 
 
 func _run_piper(text: String, out: String, scale: float) -> bool:
+	if OS.get_name() == "Windows":
+		return _run_piper_windows(text, out, scale)
 	var tmp := out + ".part.wav"
 	var args := ["--model", str(_piper["model"]), "--output_file", tmp, "--length_scale", "%.2f" % scale, "--quiet"]
 	var p := OS.execute_with_pipe(str(_piper["exe"]), PackedStringArray(args), false)
@@ -189,6 +191,40 @@ func _run_piper(text: String, out: String, scale: float) -> bool:
 		err.close()
 	DirAccess.remove_absolute(out)
 	return DirAccess.rename_absolute(tmp, out) == OK
+
+
+## Windows: piper.exe не открывает файлы, если в пути есть не латинские буквы (C:\Users\Имя\…) —
+## поэтому запускаем его из его папки (cmd: cd) и даём только короткие относительные имена: модель, словари
+## espeak, текст и звук — в voice\cache. Готовый звук переносим в кэш словаря.
+func _run_piper_windows(text: String, out: String, scale: float) -> bool:
+	var voice := str(_piper["exe"]).get_base_dir().get_base_dir()   # …\voice
+	var cache := voice.path_join("cache")
+	DirAccess.make_dir_recursive_absolute(cache)
+	var key := out.get_file().get_basename()
+	var txt := cache.path_join(key + ".txt")
+	var wav := cache.path_join(key + ".wav")
+	var f := FileAccess.open(txt, FileAccess.WRITE)
+	if f == null:
+		_set_error.call_deferred("Нельзя писать в папку %s (нужна для озвучки)" % cache)
+		return false
+	f.store_string(text.replace("\n", " ") + "\n")
+	f.close()
+	var line := "cd /d %s && piper\\piper.exe --model %s --espeak_data piper\\espeak-ng-data --length_scale %.2f --quiet --output_file cache\\%s.wav < cache\\%s.txt" \
+		% [voice.replace("/", "\\"), str(_piper["model"]).get_file(), scale, key, key]
+	var output: Array = []
+	var code := OS.execute("cmd.exe", PackedStringArray(["/d", "/s", "/c", line]), output, true)
+	DirAccess.remove_absolute(txt)
+	if not FileAccess.file_exists(wav) or FileAccess.get_file_as_bytes(wav).size() <= 44:
+		var msg := " ".join(PackedStringArray(output)).strip_edges().right(300)
+		_set_error.call_deferred("Piper не сделал звук (код %d). %s" % [code, msg])
+		DirAccess.remove_absolute(wav)
+		return false
+	DirAccess.remove_absolute(out)
+	var ok := DirAccess.rename_absolute(wav, out) == OK
+	if not ok:   # другой диск — копировать
+		ok = DirAccess.copy_absolute(wav, out) == OK
+		DirAccess.remove_absolute(wav)
+	return ok
 
 
 func _set_error(msg: String) -> void:
