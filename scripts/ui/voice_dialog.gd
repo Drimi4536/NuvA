@@ -14,6 +14,12 @@ func _init() -> void:
 		pc.tooltip_text = "Читает любые фразы. Выключите — будет голос Windows"
 		pc.toggled.connect(func(_on: bool) -> void: Speech.stop())
 		body.add_child(pc)
+	if Speech.last_error != "":
+		var w2 := UI.card("BadBox")
+		var wl := UI.label(Speech.last_error, "", true)
+		wl.custom_minimum_size.x = 460
+		w2.add_child(wl)
+		body.add_child(w2)
 	if Speech.piper_ok():
 		pass
 	elif en.is_empty():

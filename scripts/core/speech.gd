@@ -39,19 +39,35 @@ var _want := ""            # что озвучить, как только буд
 var _failed := {}          # тексты, которые Piper не смог (не пытаться снова)
 
 
+var last_error := ""        # почему встроенный голос не работает (для «Озвучка…» и сообщений)
+
+
 ## Папка voice: рядом с программой (собранная игра) или в проекте.
 func _find_piper() -> void:
 	_piper = {}
 	var exe_name := "piper/piper.exe" if OS.get_name() == "Windows" else "piper-linux/piper"
-	var dirs := [OS.get_executable_path().get_base_dir().path_join("voice"), ProjectSettings.globalize_path("res://voice")]
+	var dirs := [ProjectSettings.globalize_path("res://voice"), OS.get_executable_path().get_base_dir().path_join("voice")]
+	var why: Array = []
 	for d in dirs:
+		if not DirAccess.dir_exists_absolute(d):
+			why.append("нет папки %s" % d)
+			continue
 		var exe := str(d).path_join(exe_name)
 		if not FileAccess.file_exists(exe):
+			why.append("нет файла %s (антивирус мог убрать его в карантин)" % exe)
 			continue
+		var model := ""
 		for f in DirAccess.get_files_at(d):
 			if f.ends_with(".onnx") and FileAccess.file_exists(str(d).path_join(f + ".json")):
-				_piper = {"exe": exe, "model": str(d).path_join(f)}
-				return
+				model = str(d).path_join(f)
+		if model == "":
+			why.append("в папке %s нет модели голоса (.onnx и .onnx.json)" % d)
+			continue
+		_piper = {"exe": exe, "model": model}
+		last_error = ""
+		return
+	last_error = "Встроенный голос не найден: " + "; ".join(why)
+	push_warning(last_error)
 
 
 func piper_ok() -> bool:
@@ -149,23 +165,35 @@ func _run_piper(text: String, out: String, scale: float) -> bool:
 	var args := ["--model", str(_piper["model"]), "--output_file", tmp, "--length_scale", "%.2f" % scale, "--quiet"]
 	var p := OS.execute_with_pipe(str(_piper["exe"]), PackedStringArray(args), false)
 	if p.is_empty():
+		_set_error.call_deferred("Не удалось запустить %s" % _piper["exe"])
 		return false
 	var io: FileAccess = p["stdio"]
 	io.store_buffer((text.replace("\n", " ") + "\n").to_utf8_buffer())
 	io.close()   # конец ввода — piper начинает говорить
 	var err: FileAccess = p.get("stderr")
-	if err:
-		err.close()
 	var t0 := Time.get_ticks_msec()
 	while OS.is_process_running(int(p["pid"])) and Time.get_ticks_msec() - t0 < 20000:
 		OS.delay_msec(10)
 	if OS.is_process_running(int(p["pid"])):
 		OS.kill(int(p["pid"]))
 	if not FileAccess.file_exists(tmp) or FileAccess.get_file_as_bytes(tmp).size() <= 44:
+		var msg := ""
+		if err:
+			msg = err.get_as_text().strip_edges().right(300)
+		_set_error.call_deferred("Piper не сделал звук (код %d). %s" % [OS.get_process_exit_code(int(p["pid"])), msg])
 		DirAccess.remove_absolute(tmp)
+		if err:
+			err.close()
 		return false
+	if err:
+		err.close()
 	DirAccess.remove_absolute(out)
 	return DirAccess.rename_absolute(tmp, out) == OK
+
+
+func _set_error(msg: String) -> void:
+	last_error = msg
+	push_warning(msg)
 
 
 func _on_synth(text: String, ok: bool) -> void:
@@ -173,7 +201,10 @@ func _on_synth(text: String, ok: bool) -> void:
 		_failed[text] = true
 		if _want == text:
 			_want = ""
-			say_system(text, "en")   # Piper не справился — хоть голосом системы
+			if not say_system(text, "en"):   # Piper не справился — хоть голосом системы
+				var m := get_tree().get_first_node_in_group("main")
+				if m:
+					m.call("toast", "Озвучка не удалась: " + last_error.left(160), 6.0)
 		return
 	if _want == text:
 		_want = ""

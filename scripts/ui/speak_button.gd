@@ -26,7 +26,8 @@ func _say() -> void:
 	if not ok:
 		var m := get_tree().get_first_node_in_group("main")
 		if m:
-			m.call("toast", "Нет голоса для озвучки: добавьте английский голос в настройках речи Windows", 4.0)
+			m.call("toast", (Speech.last_error.left(220) if Speech.last_error != "" else
+				"Нет голоса для озвучки") + "  ·  подробнее: «Словарь ▾ → Озвучка…»", 7.0)
 
 
 func _draw() -> void:

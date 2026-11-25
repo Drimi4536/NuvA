@@ -270,7 +270,8 @@ func _toggle_listen() -> void:
 			if Store.media_path(str(e.get("audio", ""))) != "":
 				with_audio += 1
 		if with_audio == 0:
-			main.toast("Нет голоса для озвучки: добавьте английский голос в настройках речи Windows", 4.0)
+			main.toast((Speech.last_error.left(220) if Speech.last_error != "" else "Нет голоса для озвучки")
+				+ "  ·  подробнее: «Словарь ▾ → Озвучка…»", 7.0)
 			return
 	Speech.listen(items, _on_listen_item)
 
